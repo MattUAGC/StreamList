@@ -1,13 +1,13 @@
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
+  font-family: "Inter", Arial, sans-serif;
   background: #111827;
   color: white;
 }
 
 .navbar {
   background: #020617;
-  padding: 20px;
+  padding: 20px 35px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -29,36 +29,67 @@ body {
 }
 
 .page {
-  max-width: 700px;
+  max-width: 800px;
   margin: 60px auto;
-  padding: 30px;
+  padding: 35px;
   text-align: center;
   background: #1f2937;
-  border-radius: 12px;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+  border-radius: 14px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.45);
 }
 
 .stream-form {
-  margin-top: 20px;
+  margin-top: 25px;
 }
 
-.stream-form input {
+.stream-form input,
+.edit-input {
   width: 60%;
   padding: 12px;
   border-radius: 8px;
   border: none;
+  margin-right: 10px;
 }
 
-.stream-form button {
-  margin-left: 10px;
-  padding: 12px 18px;
+button {
+  padding: 10px 14px;
   border: none;
   border-radius: 8px;
   cursor: pointer;
   font-weight: bold;
   background: #38bdf8;
   color: #020617;
+  margin: 4px;
 }
-.stream-form button:hover {
+
+button:hover {
   background: #0ea5e9;
+}
+
+.movie-list {
+  margin-top: 30px;
+}
+
+.movie-card {
+  background: #374151;
+  padding: 15px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.completed {
+  text-decoration: line-through;
+  color: #9ca3af;
+}
+
+.empty-message {
+  color: #cbd5e1;
+}
+
+.button-group {
+  display: flex;
+  gap: 5px;
 }
