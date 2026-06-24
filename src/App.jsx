@@ -4,6 +4,9 @@ import "@fontsource/inter";
 import "./App.css";
 import list from "./data";
 
+// Helper: items with id 1-4 are subscription plans (see data.js)
+const isSubscription = (item) => item && item.id >= 1 && item.id <= 4;
+
 function StreamList() {
   const [movieInput, setMovieInput] = useState("");
   const [movies, setMovies] = useState(() => {
@@ -22,7 +25,7 @@ function StreamList() {
     if (movieInput.trim() === "") return;
 
     const newMovie = {
-      id: Date.now(),
+      id: crypto.randomUUID(),
       title: movieInput,
       completed: false,
     };
@@ -46,6 +49,11 @@ function StreamList() {
   const startEdit = (movie) => {
     setEditingId(movie.id);
     setEditInput(movie.title);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditInput("");
   };
 
   const saveEdit = (id) => {
@@ -90,6 +98,7 @@ function StreamList() {
                     onChange={(event) => setEditInput(event.target.value)}
                   />
                   <button onClick={() => saveEdit(movie.id)}>Save</button>
+                  <button onClick={cancelEdit}>Cancel</button>
                 </>
               ) : (
                 <>
@@ -117,23 +126,34 @@ function StreamList() {
 function MovieSearch() {
   const [searchTerm, setSearchTerm] = useState("");
   const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const searchMovies = async (event) => {
     event.preventDefault();
     if (searchTerm.trim() === "") return;
 
+    setLoading(true);
+    setError("");
+
     try {
       const response = await fetch(
-        `https://api.themoviedb.org/3/search/movie?api_key=${
-          import.meta.env.VITE_TMDB_API_KEY
+        `https://api.themoviedb.org/3/search/movie?api_key=${import.meta.env.VITE_TMDB_API_KEY
         }&query=${encodeURIComponent(searchTerm)}`
       );
+
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
 
       const data = await response.json();
       setResults(data.results || []);
       setSearchTerm("");
-    } catch (error) {
-      console.error("Movie search failed:", error);
+    } catch (err) {
+      console.error("Movie search failed:", err);
+      setError("Sorry, we couldn't complete your search. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -149,8 +169,12 @@ function MovieSearch() {
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
         />
-        <button type="submit">Search</button>
+        <button type="submit" disabled={loading}>
+          {loading ? "Searching..." : "Search"}
+        </button>
       </form>
+
+      {error && <p className="warning-message">{error}</p>}
 
       <div className="results-grid">
         {results.map((movie) => (
@@ -221,11 +245,15 @@ function Cart({ cart, increaseQuantity, decreaseQuantity, removeFromCart }) {
                   <p>${item.price.toFixed(2)}</p>
                 </div>
 
-                <div className="quantity-controls">
-                  <button onClick={() => decreaseQuantity(item.id)}>-</button>
-                  <span>{item.amount}</span>
-                  <button onClick={() => increaseQuantity(item.id)}>+</button>
-                </div>
+                {isSubscription(item) ? (
+                  <span className="quantity-readonly">Qty: {item.amount}</span>
+                ) : (
+                  <div className="quantity-controls">
+                    <button onClick={() => decreaseQuantity(item.id)}>-</button>
+                    <span>{item.amount}</span>
+                    <button onClick={() => increaseQuantity(item.id)}>+</button>
+                  </div>
+                )}
 
                 <button onClick={() => removeFromCart(item.id)}>Remove</button>
               </div>
