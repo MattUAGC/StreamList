@@ -5,7 +5,6 @@ import "@fontsource/inter";
 import "./App.css";
 import list from "./data";
 
-// Helper: items with id 1-4 are subscription plans (see data.js)
 const isSubscription = (item) => item && item.id >= 1 && item.id <= 4;
 
 function Login({ onLogin }) {
@@ -17,7 +16,10 @@ function Login({ onLogin }) {
       <div className="login-box">
         <GoogleLogin
           onSuccess={(credentialResponse) => {
-            localStorage.setItem("streamListUser", JSON.stringify(credentialResponse));
+            localStorage.setItem(
+              "streamListUser",
+              JSON.stringify(credentialResponse)
+            );
             onLogin(credentialResponse);
           }}
           onError={() => {
@@ -29,18 +31,10 @@ function Login({ onLogin }) {
   );
 }
 
-function StreamList() {
+function StreamList({ movies, setMovies }) {
   const [movieInput, setMovieInput] = useState("");
-  const [movies, setMovies] = useState(() => {
-    const savedMovies = localStorage.getItem("streamListMovies");
-    return savedMovies ? JSON.parse(savedMovies) : [];
-  });
   const [editingId, setEditingId] = useState(null);
   const [editInput, setEditInput] = useState("");
-
-  useEffect(() => {
-    localStorage.setItem("streamListMovies", JSON.stringify(movies));
-  }, [movies]);
 
   const addMovie = (event) => {
     event.preventDefault();
@@ -145,11 +139,12 @@ function StreamList() {
   );
 }
 
-function MovieSearch() {
+function MovieSearch({ addMovieToList }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const searchMovies = async (event) => {
     event.preventDefault();
@@ -157,10 +152,12 @@ function MovieSearch() {
 
     setLoading(true);
     setError("");
+    setSuccessMessage("");
 
     try {
       const response = await fetch(
-        `https://api.themoviedb.org/3/search/movie?api_key=${import.meta.env.VITE_TMDB_API_KEY
+        `https://api.themoviedb.org/3/search/movie?api_key=${
+          import.meta.env.VITE_TMDB_API_KEY
         }&query=${encodeURIComponent(searchTerm)}`
       );
 
@@ -177,6 +174,15 @@ function MovieSearch() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAddToStreamList = (title) => {
+    const message = addMovieToList(title);
+    setSuccessMessage(message);
+
+    setTimeout(() => {
+      setSuccessMessage("");
+    }, 3000);
   };
 
   return (
@@ -198,6 +204,18 @@ function MovieSearch() {
 
       {error && <p className="warning-message">{error}</p>}
 
+      {successMessage && (
+        <div
+          className={
+            successMessage.includes("already")
+              ? "warning-toast"
+              : "success-message"
+       }
+     >
+        {successMessage}
+   </div>
+)}
+
       <div className="results-grid">
         {results.map((movie) => (
           <div key={movie.id} className="result-card">
@@ -211,6 +229,10 @@ function MovieSearch() {
             <p>Release Date: {movie.release_date || "N/A"}</p>
             <p>Rating: {movie.vote_average}</p>
             <p>{movie.overview}</p>
+
+            <button onClick={() => handleAddToStreamList(movie.title)}>
+              Add to StreamList
+            </button>
           </div>
         ))}
       </div>
@@ -283,8 +305,9 @@ function Cart({ cart, increaseQuantity, decreaseQuantity, removeFromCart }) {
           </div>
 
           <h2 className="cart-total">Total: ${totalPrice.toFixed(2)}</h2>
+
           <Link to="/credit-card">
-           <button>Checkout</button>
+            <button>Checkout</button>
           </Link>
         </>
       )}
@@ -388,7 +411,8 @@ function CreditCard() {
       </form>
 
       <p className="security-note">
-        Demo note: In production, payment data should use a PCI DSS compliant processor and tokenization instead of localStorage.
+        Demo note: In production, payment data should use a PCI DSS compliant
+        processor and tokenization instead of localStorage.
       </p>
     </div>
   );
@@ -412,6 +436,11 @@ function App() {
     return savedUser ? JSON.parse(savedUser) : null;
   });
 
+  const [movies, setMovies] = useState(() => {
+    const savedMovies = localStorage.getItem("streamListMovies");
+    return savedMovies ? JSON.parse(savedMovies) : [];
+  });
+
   const [warning, setWarning] = useState("");
 
   const [cart, setCart] = useState(() => {
@@ -420,19 +449,43 @@ function App() {
   });
 
   useEffect(() => {
+    localStorage.setItem("streamListMovies", JSON.stringify(movies));
+  }, [movies]);
+
+  useEffect(() => {
     localStorage.setItem("streamListCart", JSON.stringify(cart));
   }, [cart]);
 
   const cartCount = cart.reduce((total, item) => total + item.amount, 0);
 
+  const addMovieToList = (title) => {
+    const alreadyExists = movies.some(
+      (movie) => movie.title.toLowerCase() === title.toLowerCase()
+    );
+
+    if (alreadyExists) {
+      return "That movie is already in your StreamList.";
+    }
+
+    const newMovie = {
+      id: crypto.randomUUID(),
+      title,
+      completed: false,
+    };
+
+    setMovies([...movies, newMovie]);
+
+    return `${title} added to your StreamList!`;
+  };
+
   const addToCart = (product) => {
-    const isSubscription = product.id >= 1 && product.id <= 4;
+    const isItemSubscription = product.id >= 1 && product.id <= 4;
     const cartHasSubscription = cart.some(
       (item) => item.id >= 1 && item.id <= 4
     );
     const existingItem = cart.find((item) => item.id === product.id);
 
-    if (isSubscription && cartHasSubscription) {
+    if (isItemSubscription && cartHasSubscription) {
       setWarning("Only one subscription can be added to the cart at a time.");
       return;
     }
@@ -454,9 +507,10 @@ function App() {
 
   const increaseQuantity = (id) => {
     const itemToUpdate = cart.find((item) => item.id === id);
-    const isSubscription = itemToUpdate && itemToUpdate.id >= 1 && itemToUpdate.id <= 4;
+    const isItemSubscription =
+      itemToUpdate && itemToUpdate.id >= 1 && itemToUpdate.id <= 4;
 
-    if (isSubscription) {
+    if (isItemSubscription) {
       setWarning("Subscription quantity cannot be increased.");
       return;
     }
@@ -486,55 +540,63 @@ function App() {
     setWarning("");
     setCart(cart.filter((item) => item.id !== id));
   };
-const logout = () => {
-  localStorage.removeItem("streamListUser");
-  setUser(null);
-};
-return (
-  <BrowserRouter>
-    {!user ? (
-      <Login onLogin={setUser} />
-    ) : (
-      <>
-        <nav className="navbar">
-          <h2>EZTechMovie</h2>
 
-          <div className="nav-links">
-            <Link to="/">StreamList</Link>
-            <Link to="/movies">Movie Search</Link>
-            <Link to="/shop">Shop</Link>
-            <Link to="/cart">Cart ({cartCount})</Link>
-            <Link to="/credit-card">Credit Card</Link>
-            <Link to="/about">About</Link>
-            <button onClick={logout}>Logout</button>
-          </div>
-        </nav>
+  const logout = () => {
+    localStorage.removeItem("streamListUser");
+    setUser(null);
+  };
 
-        <Routes>
-          <Route path="/" element={<StreamList />} />
-          <Route path="/movies" element={<MovieSearch />} />
-          <Route
-            path="/shop"
-            element={<Shop addToCart={addToCart} warning={warning} />}
-          />
-          <Route
-            path="/cart"
-            element={
-              <Cart
-                cart={cart}
-                increaseQuantity={increaseQuantity}
-                decreaseQuantity={decreaseQuantity}
-                removeFromCart={removeFromCart}
-              />
-            }
-          />
-          <Route path="/credit-card" element={<CreditCard />} />
-          <Route path="/about" element={<About />} />
-        </Routes>
-      </>
-    )}
-  </BrowserRouter>
-);
+  return (
+    <BrowserRouter>
+      {!user ? (
+        <Login onLogin={setUser} />
+      ) : (
+        <>
+          <nav className="navbar">
+            <h2>EZTechMovie</h2>
+
+            <div className="nav-links">
+              <Link to="/">StreamList</Link>
+              <Link to="/movies">Movie Search</Link>
+              <Link to="/shop">Shop</Link>
+              <Link to="/cart">Cart ({cartCount})</Link>
+              <Link to="/credit-card">Credit Card</Link>
+              <Link to="/about">About</Link>
+              <button onClick={logout}>Logout</button>
+            </div>
+          </nav>
+
+          <Routes>
+            <Route
+              path="/"
+              element={<StreamList movies={movies} setMovies={setMovies} />}
+            />
+            <Route
+              path="/movies"
+              element={<MovieSearch addMovieToList={addMovieToList} />}
+            />
+            <Route
+              path="/shop"
+              element={<Shop addToCart={addToCart} warning={warning} />}
+            />
+            <Route
+              path="/cart"
+              element={
+                <Cart
+                  cart={cart}
+                  increaseQuantity={increaseQuantity}
+                  decreaseQuantity={decreaseQuantity}
+                  removeFromCart={removeFromCart}
+                />
+              }
+            />
+            <Route path="/credit-card" element={<CreditCard />} />
+            <Route path="/about" element={<About />} />
+          </Routes>
+        </>
+      )}
+    </BrowserRouter>
+  );
 }
 
 export default App;
