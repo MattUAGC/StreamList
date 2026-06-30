@@ -1,11 +1,33 @@
 import { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link, useNavigate } from "react-router-dom";
+import { GoogleLogin } from "@react-oauth/google";
 import "@fontsource/inter";
 import "./App.css";
 import list from "./data";
 
 // Helper: items with id 1-4 are subscription plans (see data.js)
 const isSubscription = (item) => item && item.id >= 1 && item.id <= 4;
+
+function Login({ onLogin }) {
+  return (
+    <div className="page">
+      <h1>EZTechMovie Login</h1>
+      <p>Please sign in with Google to access StreamList.</p>
+
+      <div className="login-box">
+        <GoogleLogin
+          onSuccess={(credentialResponse) => {
+            localStorage.setItem("streamListUser", JSON.stringify(credentialResponse));
+            onLogin(credentialResponse);
+          }}
+          onError={() => {
+            alert("Login failed. Please try again.");
+          }}
+        />
+      </div>
+    </div>
+  );
+}
 
 function StreamList() {
   const [movieInput, setMovieInput] = useState("");
@@ -261,8 +283,113 @@ function Cart({ cart, increaseQuantity, decreaseQuantity, removeFromCart }) {
           </div>
 
           <h2 className="cart-total">Total: ${totalPrice.toFixed(2)}</h2>
+          <Link to="/credit-card">
+           <button>Checkout</button>
+          </Link>
         </>
       )}
+    </div>
+  );
+}
+
+function CreditCard() {
+  const navigate = useNavigate();
+
+  const [cardInfo, setCardInfo] = useState(() => {
+    const savedCard = localStorage.getItem("streamListCard");
+    return savedCard
+      ? JSON.parse(savedCard)
+      : {
+          name: "",
+          cardNumber: "",
+          expiration: "",
+          cvv: "",
+        };
+  });
+
+  const [message, setMessage] = useState("");
+
+  const formatCardNumber = (value) => {
+    const numbers = value.replace(/\D/g, "").slice(0, 16);
+    return numbers.replace(/(.{4})/g, "$1 ").trim();
+  };
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+
+    setCardInfo({
+      ...cardInfo,
+      [name]: name === "cardNumber" ? formatCardNumber(value) : value,
+    });
+  };
+
+  const saveCard = (event) => {
+    event.preventDefault();
+
+    const cardPattern = /^\d{4} \d{4} \d{4} \d{4}$/;
+
+    if (!cardPattern.test(cardInfo.cardNumber)) {
+      setMessage("Card number must follow this format: 1234 5678 9012 3456");
+      return;
+    }
+
+    localStorage.setItem("streamListCard", JSON.stringify(cardInfo));
+    setMessage("Card information saved successfully.");
+  };
+
+  return (
+    <div className="page">
+      <h1>Credit Card Management</h1>
+      <p>Enter payment information for checkout.</p>
+
+      {message && <p className="warning-message">{message}</p>}
+
+      <form onSubmit={saveCard} className="card-form">
+        <input
+          type="text"
+          name="name"
+          placeholder="Cardholder Name"
+          value={cardInfo.name}
+          onChange={handleChange}
+          required
+        />
+
+        <input
+          type="text"
+          name="cardNumber"
+          placeholder="1234 5678 9012 3456"
+          value={cardInfo.cardNumber}
+          onChange={handleChange}
+          required
+        />
+
+        <input
+          type="text"
+          name="expiration"
+          placeholder="MM/YY"
+          value={cardInfo.expiration}
+          onChange={handleChange}
+          required
+        />
+
+        <input
+          type="text"
+          name="cvv"
+          placeholder="CVV"
+          value={cardInfo.cvv}
+          onChange={handleChange}
+          required
+        />
+
+        <button type="submit">Save Card</button>
+        <button type="button" onClick={() => navigate("/cart")}>
+          Back to Cart
+        </button>
+      </form>
+
+      <p className="security-note">
+        Demo note: In production, payment data should use a PCI DSS compliant processor and tokenization instead of localStorage.
+      </p>
     </div>
   );
 }
@@ -280,6 +407,11 @@ function About() {
 }
 
 function App() {
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem("streamListUser");
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+
   const [warning, setWarning] = useState("");
 
   const [cart, setCart] = useState(() => {
@@ -354,43 +486,55 @@ function App() {
     setWarning("");
     setCart(cart.filter((item) => item.id !== id));
   };
+const logout = () => {
+  localStorage.removeItem("streamListUser");
+  setUser(null);
+};
+return (
+  <BrowserRouter>
+    {!user ? (
+      <Login onLogin={setUser} />
+    ) : (
+      <>
+        <nav className="navbar">
+          <h2>EZTechMovie</h2>
 
-  return (
-    <BrowserRouter>
-      <nav className="navbar">
-        <h2>EZTechMovie</h2>
+          <div className="nav-links">
+            <Link to="/">StreamList</Link>
+            <Link to="/movies">Movie Search</Link>
+            <Link to="/shop">Shop</Link>
+            <Link to="/cart">Cart ({cartCount})</Link>
+            <Link to="/credit-card">Credit Card</Link>
+            <Link to="/about">About</Link>
+            <button onClick={logout}>Logout</button>
+          </div>
+        </nav>
 
-        <div className="nav-links">
-          <Link to="/">StreamList</Link>
-          <Link to="/movies">Movie Search</Link>
-          <Link to="/shop">Shop</Link>
-          <Link to="/cart">Cart ({cartCount})</Link>
-          <Link to="/about">About</Link>
-        </div>
-      </nav>
-
-      <Routes>
-        <Route path="/" element={<StreamList />} />
-        <Route path="/movies" element={<MovieSearch />} />
-        <Route
-          path="/shop"
-          element={<Shop addToCart={addToCart} warning={warning} />}
-        />
-        <Route
-          path="/cart"
-          element={
-            <Cart
-              cart={cart}
-              increaseQuantity={increaseQuantity}
-              decreaseQuantity={decreaseQuantity}
-              removeFromCart={removeFromCart}
-            />
-          }
-        />
-        <Route path="/about" element={<About />} />
-      </Routes>
-    </BrowserRouter>
-  );
+        <Routes>
+          <Route path="/" element={<StreamList />} />
+          <Route path="/movies" element={<MovieSearch />} />
+          <Route
+            path="/shop"
+            element={<Shop addToCart={addToCart} warning={warning} />}
+          />
+          <Route
+            path="/cart"
+            element={
+              <Cart
+                cart={cart}
+                increaseQuantity={increaseQuantity}
+                decreaseQuantity={decreaseQuantity}
+                removeFromCart={removeFromCart}
+              />
+            }
+          />
+          <Route path="/credit-card" element={<CreditCard />} />
+          <Route path="/about" element={<About />} />
+        </Routes>
+      </>
+    )}
+  </BrowserRouter>
+);
 }
 
 export default App;
